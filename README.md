@@ -7,7 +7,6 @@ Uses `SEM_InteractionMenu` client exports to check duty status and updates two s
 
 ## ✨ Features
 - 🔄 Live sync of on-duty **LEO** & **Fire** counts  
-- 🎮 Lightweight client-server handling  
 - 🛠️ Fully configurable update interval & formatting  
 - 🔑 Works with **voice** or **text channels** (channel name updates)  
 - ⚡ Uses a Discord bot with **Manage Channels** permission  
@@ -17,4 +16,4 @@ Uses `SEM_InteractionMenu` client exports to check duty status and updates two s
 ## 📂 Installation
 1. Download or clone this repo into your FiveM `resources` folder:
    ```bash
-   git clonehttps://github.com/ngomez93/discord_onduty.git
+   git clone https://github.com/ngomez93/discord_onduty.git
