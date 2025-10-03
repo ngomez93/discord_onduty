@@ -1,95 +1,105 @@
-local dutyStatus = {} -- stores client duty reports (for SEM framework)
-
--- Framework bootstraps
+-- server.lua
 local ESX, QBCore = nil, nil
 
+-- Framework setup
 if Config.Framework == "ESX" then
-    TriggerEvent('esx:getSharedObject', function(obj) ESX = obj end)
+    -- ESX Legacy uses export
+    ESX = exports['es_extended']:getSharedObject()
 elseif Config.Framework == "QBCore" then
     QBCore = exports['qb-core']:GetCoreObject()
 end
 
--- When SEM framework: receive client updates
-RegisterNetEvent("dutySync:updateStatus", function(isLEO, isFire)
-    if Config.Framework ~= "SEM" then return end
-    local src = source
-    dutyStatus[src] = { LEO = isLEO, Fire = isFire }
-end)
-
--- Cleanup on disconnect
-AddEventHandler("playerDropped", function()
-    dutyStatus[source] = nil
-end)
-
--- Count who’s on duty depending on framework
-local function CountDuty()
-    local leo, fire = 0, 0
+-- Function to count duty players
+local function GetDutyCounts()
+    local leoCount, fireCount = 0, 0
 
     if Config.Framework == "SEM" then
-        -- use client-reported states
-        for _, status in pairs(dutyStatus) do
-            if status.LEO then leo = leo + 1 end
-            if status.Fire then fire = fire + 1 end
+        -- SEM relies on clients sending their onduty status
+        for _, playerId in ipairs(GetPlayers()) do
+            local isLEO = Player(playerId).state.isOndutyLEO
+            local isFire = Player(playerId).state.isOndutyFire
+            if isLEO then leoCount = leoCount + 1 end
+            if isFire then fireCount = fireCount + 1 end
         end
 
-    elseif Config.Framework == "ESX" and ESX then
-        for _, playerId in ipairs(ESX.GetPlayers()) do
+    elseif Config.Framework == "ESX" then
+        -- ESX Legacy job check
+        local xPlayers = ESX.GetPlayers()
+        for _, playerId in ipairs(xPlayers) do
             local xPlayer = ESX.GetPlayerFromId(playerId)
-            if xPlayer then
-                local job = xPlayer.job.name
-                for _, name in ipairs(Config.ESXJobs.LEO) do
-                    if job == name then leo = leo + 1 end
+            if xPlayer and xPlayer.job then
+                for _, job in ipairs(Config.ESXJobs.LEO) do
+                    if xPlayer.job.name == job then
+                        leoCount = leoCount + 1
+                        break
+                    end
                 end
-                for _, name in ipairs(Config.ESXJobs.Fire) do
-                    if job == name then fire = fire + 1 end
+                for _, job in ipairs(Config.ESXJobs.Fire) do
+                    if xPlayer.job.name == job then
+                        fireCount = fireCount + 1
+                        break
+                    end
                 end
             end
         end
 
-    elseif Config.Framework == "QBCore" and QBCore then
+    elseif Config.Framework == "QBCore" then
+        -- QBCore job check
         for _, playerId in pairs(QBCore.Functions.GetPlayers()) do
-            local player = QBCore.Functions.GetPlayer(playerId)
-            if player then
-                local job = player.PlayerData.job.name
-                for _, name in ipairs(Config.QBJobs.LEO) do
-                    if job == name then leo = leo + 1 end
+            local Player = QBCore.Functions.GetPlayer(playerId)
+            if Player and Player.PlayerData and Player.PlayerData.job then
+                local jobName = Player.PlayerData.job.name
+                for _, job in ipairs(Config.QBJobs.LEO) do
+                    if jobName == job then
+                        leoCount = leoCount + 1
+                        break
+                    end
                 end
-                for _, name in ipairs(Config.QBJobs.Fire) do
-                    if job == name then fire = fire + 1 end
+                for _, job in ipairs(Config.QBJobs.Fire) do
+                    if jobName == job then
+                        fireCount = fireCount + 1
+                        break
+                    end
                 end
             end
         end
     end
 
-    return leo, fire
+    return leoCount, fireCount
 end
 
--- Update a Discord channel’s name
-local function UpdateChannel(channelId, newName)
+-- Update Discord channel names
+local function UpdateDiscord()
+    local leoCount, fireCount = GetDutyCounts()
+
     PerformHttpRequest(
-        ("https://discord.com/api/v10/channels/%s"):format(channelId),
-        function(err, text, headers)
-            if err == 200 then
-                print(("[DutySync] ✅ Updated %s → %s"):format(channelId, newName))
-            else
-                print(("[DutySync] ❌ Failed to update %s (%s): %s"):format(channelId, err, text))
-            end
-        end,
+        ("https://discord.com/api/v10/channels/%s"):format(Config.Discord.LEOChannelId),
+        function(err, text, headers) end,
         "PATCH",
-        json.encode({ name = newName }),
-        {
-            ["Authorization"] = "Bot " .. Config.Discord.BotToken,
-            ["Content-Type"] = "application/json"
-        }
+        json.encode({ name = Config.LEOChannelName:format(leoCount) }),
+        { ["Content-Type"] = "application/json", ["Authorization"] = "Bot " .. Config.Discord.BotToken }
+    )
+
+    PerformHttpRequest(
+        ("https://discord.com/api/v10/channels/%s"):format(Config.Discord.FireChannelId),
+        function(err, text, headers) end,
+        "PATCH",
+        json.encode({ name = Config.FireChannelName:format(fireCount) }),
+        { ["Content-Type"] = "application/json", ["Authorization"] = "Bot " .. Config.Discord.BotToken }
     )
 end
 
--- Main update loop
+-- Run updater
 CreateThread(function()
     while true do
-        local leo, fire = CountDuty()
-        UpdateChannel(Config.Discord.LEOChannelId,  string.format(Config.LEOChannelName, leo))
-        UpdateChannel(Config.Discord.FireChannelId, string.format(Config.FireChannelName, fire))
+        UpdateDiscord()
         Wait(Config.UpdateInterval * 1000)
     end
+end)
+
+-- SEM client sync
+RegisterNetEvent("duty-discordsync:updateSEMStatus", function(isLEO, isFire)
+    local src = source
+    Player(src).state.isOndutyLEO = isLEO
+    Player(src).state.isOndutyFire = isFire
 end)
