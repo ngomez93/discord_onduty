@@ -1,6 +1,6 @@
 # 🚓🚒 On Duty Discord Sync for SEM_InteractionMenu
 
-This resource syncs **on-duty LEO** and **on-duty Fire** player counts to **Discord channels** if your using the SEM_InteractionMenu.  
+This resource syncs **on-duty LEO** and **on-duty Fire** player counts to **Discord channels** if your using the SEM_InteractionMenu, ESX or QbCore.  
 Uses `SEM_InteractionMenu` client exports to check duty status and updates two separate channels in Discord with live counts.
 
 ---
