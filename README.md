@@ -17,3 +17,7 @@ Uses `SEM_InteractionMenu` client exports to check duty status and updates two s
 1. Download or clone this repo into your FiveM `resources` folder:
    ```bash
    git clone https://github.com/ngomez93/discord_onduty.git
+
+---
+## 🛠️ Support
+Join my discord server for support. https://discord.gg/8UPWwVsa4t
